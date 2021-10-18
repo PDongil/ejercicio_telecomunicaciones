@@ -1,0 +1,449 @@
+---
+title: "Untitled"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Importación de las librerías
+```{r}
+suppressWarnings(suppressPackageStartupMessages(library(foreign)))
+suppressWarnings(suppressPackageStartupMessages(library(funModeling)))
+suppressWarnings(suppressPackageStartupMessages(library(mice)))
+suppressWarnings(suppressPackageStartupMessages(library(DataExplorer)))
+suppressWarnings(suppressPackageStartupMessages(library(ggplot2)))
+suppressWarnings(suppressPackageStartupMessages(library(corrplot)))
+suppressWarnings(suppressPackageStartupMessages(library(caret)))
+suppressWarnings(suppressPackageStartupMessages(library(sampling)))
+suppressWarnings(suppressPackageStartupMessages(library(dplyr)))
+suppressWarnings(suppressPackageStartupMessages(library(doParallel)))
+```
+
+# Lectura del archivo de datos
+```{r, warning=FALSE}
+data.quiz <- as.data.frame(read.spss("48211123-datos.sav"))
+```
+
+```{r}
+# Primeros registros.
+head(data.quiz)
+# Estructura.
+str(data.quiz)
+# Dimensión.
+dim(data.quiz)
+```
+
+# Datos NAs
+```{r}
+md.pattern(data.quiz, rotate.names = TRUE)
+plot_missing(data.quiz)
+```
+
+Comentario//: Este dataset no contiene ningún valor nulo.
+
+
+# Análisis Exploratorio de los datos
+```{r}
+summary(data.quiz)
+```
+```{r}
+status(data.quiz)
+profiling_num(data.quiz)
+```
+
+# Análisis de Correlación entre variables continuas
+```{r}
+# Variables numéricas.
+var.num <- data.quiz[, c(1,3,4,6,9,14)]
+# Matriz de correlación.
+corr.quiz <- as.matrix(round(cor(var.num),2))
+corr.quiz
+# Visualizar la matriz de correlación.
+corrplot(cor(var.num),
+         type = "upper", 
+         method = "circle", 
+         tl.col = "black",
+         title = "Correlaciones entre variables",
+         pch.cex = 2,
+         tl.cex = .8)
+```
+
+```{r}
+# Descartar las variables explicativas que estén altamente correlacionadas.
+findCorrelation(corr.quiz, cutoff = .7, verbose = TRUE, names = TRUE)
+```
+
+Comentarios//: La variable "coche" está altamente correlacionada con los ingresos del hogar. Por tanto, la variable "coche" se descarta del análisis.
+
+```{r}
+# Dataframe sin la variable "coche".
+datamodified.quiz <- data.quiz[,-6]
+head(datamodified.quiz)
+```
+
+# Análisis de la Variable Objetivo
+```{r}
+ggplot(datamodified.quiz, aes(x = respuest)) +
+  geom_bar(colour = "black", fill = "darkblue")
+
+table(data.quiz$respuest)
+```
+
+Comentarios//: La variable "respuest" está desbalanceada, es decir, hay significativamente mayor número de clientes que no respondieron las ofertas mensuales enviadas que los que sí la respondieron. Por tanto, dicha variable hay que balancearla mediante el Método del Cubo, el cual se submuestrea la clase mayoritaria.
+
+
+# Balanceado de la Muestra
+
+```{r}
+# Dataframe que contiene la población de datos de la clase mayoritaria (respuest == "No").
+no.respuest <- subset(datamodified.quiz, respuest == "No")
+head(no.respuest)
+```
+
+```{r}
+# Crear las variables indicadoras para cada una de las variables de equilibrio.
+X1 <- no.respuest$edad
+colnames(X1) <- levels(no.respuest$edad)
+
+X2 <- disjunctive(no.respuest$marital)
+colnames(X2) <- levels(no.respuest$marital)
+
+X3 <- no.respuest$direcc
+colnames(X3) <- levels(no.respuest$direcc)
+
+X4 <- no.respuest$ingres
+colnames(X4) <- levels(no.respuest$ingres)
+
+X5 <- disjunctive(no.respuest$ingcat)
+colnames(X5) <- levels(no.respuest$ingcat)
+
+X6 <- disjunctive(no.respuest$cochecat)
+colnames(X6) <- levels(no.respuest$cochecat)
+
+X7 <- disjunctive(no.respuest$educ)
+colnames(X7) <- levels(no.respuest$educ)
+
+X8 <- no.respuest$empleo
+colnames(X8) <- levels(no.respuest$empleo)
+
+X9 <- disjunctive(no.respuest$retirado)
+colnames(X9) <- levels(no.respuest$retirado)
+
+X10 <- disjunctive(no.respuest$empcat)
+colnames(X10) <- levels(no.respuest$empcat)
+
+X11 <- disjunctive(no.respuest$satlab)
+colnames(X11) <- levels(no.respuest$satlab)
+
+X12 <- disjunctive(no.respuest$genero)
+colnames(X12) <- levels(no.respuest$genero)
+
+X13 <- no.respuest$residen
+colnames(X13) <- levels(no.respuest$residen)
+
+X14 <- disjunctive(no.respuest$inalam)
+colnames(X14) <- levels(no.respuest$inalam)
+
+X15 <- disjunctive(no.respuest$multline)
+colnames(X15) <- levels(no.respuest$multline)
+
+X16 <- disjunctive(no.respuest$voz)
+colnames(X16) <- levels(no.respuest$voz)
+
+X17 <- disjunctive(no.respuest$busca)
+colnames(X17) <- levels(no.respuest$busca)
+
+X18 <- disjunctive(no.respuest$internet)
+colnames(X18) <- levels(no.respuest$internet)
+
+X19 <- disjunctive(no.respuest$idllam)
+colnames(X19) <- levels(no.respuest$idllam)
+
+X20 <- disjunctive(no.respuest$espera)
+colnames(X20) <- levels(no.respuest$espera)
+
+X21 <- disjunctive(no.respuest$tv)
+colnames(X21) <- levels(no.respuest$tv)
+
+X22 <- disjunctive(no.respuest$video)
+colnames(X22) <- levels(no.respuest$video)
+
+X23 <- disjunctive(no.respuest$cd)
+colnames(X23) <- levels(no.respuest$cd)
+
+X24 <- disjunctive(no.respuest$pda)
+colnames(X24) <- levels(no.respuest$pda)
+
+X25 <- disjunctive(no.respuest$pc)
+colnames(X25) <- levels(no.respuest$pc)
+
+X26 <- disjunctive(no.respuest$fax)
+colnames(X26) <- levels(no.respuest$fax)
+
+X27 <- disjunctive(no.respuest$noticias)
+colnames(X27) <- levels(no.respuest$noticias)
+```
+
+```{r}
+# Definir la variable UNO.
+UNO <- rep(1, dim(no.respuest)[1])
+```
+
+```{r}
+# Contruir la matriz de equilibrio, a partir de todas las variables auxiliares + UNO.
+X.matrix <- cbind(UNO, X1, X2, X3, X4, X5, X6, X7, X8, X9, X10, 
+                  X11, X12, X13, X14, X15, X16, X17, X18, X19, 
+                  X20, X21, X22, X23, X24, X25, X26, X27)
+```
+
+```{r}
+## Calcular las probabilidades de inclusión.
+nSI <- 679
+nNO <- nrow(no.respuest)
+pik <- rep(nSI/nNO, nNO)
+```
+
+```{r}
+# Seleccionar la muestra representativa.
+s <-  samplecube(X.matrix, pik, order = 1, comment = FALSE, method = 2)
+```
+
+```{r}
+# Definir la muestra seleccionada por el método del Cubo.
+no.muestra <- cbind(no.respuest, s)
+no.muestra <- subset(no.muestra, s == 1)
+no.muestra$s <- NULL
+
+# Dataframe final, tras el método del Cubo.
+si.respuest <- subset(datamodified.quiz, respuest == "Sí")
+datafinal.quiz <- rbind(no.muestra, si.respuest)
+head(datafinal.quiz)
+```
+
+```{r}
+# Comprobar que la variable "respuest" está balanceada.
+table(datafinal.quiz$respuest)
+ggplot(datafinal.quiz, aes(x = respuest)) +
+  geom_bar(colour = "black", fill = "darkblue")
+```
+
+```{r}
+# Dimensión final del dataset.
+dim(datafinal.quiz)
+```
+
+Comentario//: La dimensión final del dataset es de 1.358 registros, 27 variables explicativas y 1 variable a explicar.
+
+
+# Análisis Gráfico
+
+## Variables Explicativas Cualitativas
+```{r}
+ggplot(datafinal.quiz, aes(x = genero)) +
+  geom_bar(colour = "black", fill = "grey") + 
+  facet_grid(respuest~.) + 
+  ggtitle("Nº clientes que respondieron o no a las ofertas, según su género")
+
+ggplot(datafinal.quiz, aes(x = marital)) +
+  geom_bar(colour = "black", fill = "lightblue") + 
+  facet_grid(respuest~.) + 
+  ggtitle("Nº clientes que respondieron o no a las ofertas, según su estado civil")
+
+ggplot(datafinal.quiz, aes(x = ingcat)) +
+  geom_bar(colour = "black", fill = "red") + 
+  facet_grid(respuest~.) + 
+  ggtitle("Nº clientes que respondieron o no a las ofertas, según su categoría de ingresos")
+
+ggplot(datafinal.quiz, aes(x = cochecat)) +
+  geom_bar(colour = "black", fill = "pink") + 
+  facet_grid(respuest~.) + 
+  ggtitle("Nº clientes que respondieron o no a las ofertas, según su categoría del coche")
+
+ggplot(datafinal.quiz, aes(x = educ)) +
+  geom_bar(colour = "black", fill = "yellow") + 
+  facet_grid(respuest~.) + 
+  ggtitle("Nº clientes que respondieron o no a las ofertas, según su nivel educativo")
+
+ggplot(datafinal.quiz, aes(x = retirado)) +
+  geom_bar(colour = "black", fill = "green") + 
+  facet_grid(respuest~.) + 
+  ggtitle("Nº clientes que respondieron o no a las ofertas, según esté retirado")
+
+ggplot(datafinal.quiz, aes(x = empcat)) +
+  geom_bar(colour = "black", fill = "brown") + 
+  facet_grid(respuest~.) + 
+  ggtitle("Nº clientes que respondieron o no a las ofertas, según los años en la empresa")
+
+ggplot(datafinal.quiz, aes(x = satlab)) +
+  geom_bar(colour = "black", fill = "purple") + 
+  facet_grid(respuest~.) + 
+  ggtitle("Nº clientes que respondieron o no a las ofertas, según su satisfacción laboral")
+
+ggplot(datafinal.quiz, aes(x = inalam)) +
+  geom_bar(colour = "black", fill = "blue") + 
+  facet_grid(respuest~.) + 
+  ggtitle("Nº clientes que respondieron o no a las ofertas, según si tiene  serv. inalámbrico")
+
+ggplot(datafinal.quiz, aes(x = multline)) +
+  geom_bar(colour = "black", fill = "yellow") + 
+  facet_grid(respuest~.) + 
+  ggtitle("Nº clientes que respondieron o no a las ofertas, según si tiene  múltiples líneas")
+
+ggplot(datafinal.quiz, aes(x = voz)) +
+  geom_bar(colour = "black", fill = "green") + 
+  facet_grid(respuest~.) + 
+  ggtitle("Nº clientes que respondieron o no a las ofertas, según si tiene  buzón de voz")
+
+ggplot(datafinal.quiz, aes(x = busca)) +
+  geom_bar(colour = "black", fill = "red") + 
+  facet_grid(respuest~.) + 
+  ggtitle("Nº clientes que respondieron o no a las ofertas, según si tiene  buscapersonas")
+
+ggplot(datafinal.quiz, aes(x = internet)) +
+  geom_bar(colour = "black", fill = "pink") + 
+  facet_grid(respuest~.) + 
+  ggtitle("Nº clientes que respondieron o no a las ofertas, según si tiene internet")
+
+ggplot(datafinal.quiz, aes(x = idllam)) +
+  geom_bar(colour = "black", fill = "green") + 
+  facet_grid(respuest~.) + 
+  ggtitle("Nº clientes que respondieron o no a las ofertas, según si tiene ID llamadas")
+
+ggplot(datafinal.quiz, aes(x = espera)) +
+  geom_bar(colour = "black", fill = "black") + 
+  facet_grid(respuest~.) + 
+  ggtitle("Nº clientes que respondieron o no a las ofertas, según si tiene llamada en espera")
+
+ggplot(datafinal.quiz, aes(x = tv)) +
+  geom_bar(colour = "black", fill = "purple") + 
+  facet_grid(respuest~.) + 
+  ggtitle("Nº clientes que respondieron o no a las ofertas, según si tiene  televisión")
+
+ggplot(datafinal.quiz, aes(x = video)) +
+  geom_bar(colour = "black", fill = "lightblue") + 
+  facet_grid(respuest~.) + 
+  ggtitle("Nº clientes que respondieron o no a las ofertas, según si tiene  vídeo")
+
+ggplot(datafinal.quiz, aes(x = cd)) +
+  geom_bar(colour = "black", fill = "grey") + 
+  facet_grid(respuest~.) + 
+  ggtitle("Nº clientes que respondieron o no a las ofertas, según si tiene  Hi-fi")
+
+ggplot(datafinal.quiz, aes(x = pda)) +
+  geom_bar(colour = "black", fill = "purple") + 
+  facet_grid(respuest~.) + 
+  ggtitle("Nº clientes que respondieron o no a las ofertas, según si tiene  PDA")
+
+ggplot(datafinal.quiz, aes(x = pc)) +
+  geom_bar(colour = "black", fill = "green") + 
+  facet_grid(respuest~.) + 
+  ggtitle("Nº clientes que respondieron o no a las ofertas, según si tiene  ordenador")
+
+ggplot(datafinal.quiz, aes(x = fax)) +
+  geom_bar(colour = "black", fill = "orange") + 
+  facet_grid(respuest~.) + 
+  ggtitle("Nº clientes que respondieron o no a las ofertas, según si tiene  fax")
+
+ggplot(datafinal.quiz, aes(x = noticias)) +
+  geom_bar(colour = "black", fill = "black") + 
+  facet_grid(respuest~.) + 
+  ggtitle("Nº clientes que respondieron o no a las ofertas, según si está suscrito a periódico")
+```
+
+
+## Variables Explicativas Numéricas
+```{r, warning=FALSE}
+plotar(datafinal.quiz, target = "respuest", plot_type = "boxplot") 
+```
+
+```{r}
+# Primeros registros de clientes que llevan viviendo en la misma dirección más de 40 años.
+head(data.quiz[datafinal.quiz$direcc>40,])
+```
+Comentarios//: Lógicamente, los clientes más mayores (60 años) han vivido en el mismo hogar más de 40 años.
+
+```{r}
+# Primeros registros de clientes que tienen unos ingresos menos de 10.000 euros.
+head(data.quiz[datafinal.quiz$ingres<10, ])
+```
+
+Comentarios//: Los ingresos más bajos se encontraron en clientes mayores de 60 años, retirados y que, en su mayoría, no respondieron a las ofertas mensuales.
+
+
+
+# Selección de Variables
+
+Las variables son seleccionadas mediante la eliminación de manera recursiva mediante un random forest. Primeramente, se escalan y normalizan los datos, ya que las variables de estudio no están en el mismo rango y ello podría influir en las predicciones.
+```{r}
+val.normalizar <- preProcess(as.data.frame(datafinal.quiz), 
+                             method = c("center", "scale"))
+
+normaliz.quiz <- predict(val.normalizar, as.data.frame(datafinal.quiz))
+summary(normaliz.quiz)
+```
+
+```{r}
+# Variables explicativas.
+x <- normaliz.quiz %>% select(-respuest) %>%
+  as.data.frame()
+
+# variable objetivo.
+y <- normaliz.quiz$respuest
+
+# Dividir el dataset en: train (80%) y test (20%).
+set.seed(123)
+inTrain <- createDataPartition(y, p = .80, list = FALSE)[,1]
+
+x.train <- x[inTrain,]
+x.test <- x[-inTrain,]
+registerDoParallel(cores = 4)
+# Definir el control usando la función de selección de random forest.
+control <- rfeControl(functions = rfFuncs,
+                      method = "cv",
+                      number = 4)
+# Definir la semilla para la reproductividad de los resultados.
+set.seed(123)
+# Ejecutar el algoritmo RFE.
+rfe.quiz <- rfe(x.train,
+                y.train,
+                sizes = c(2:27),
+                rfeControl = control)
+y.train <- y[inTrain]
+y.test <- y[-inTrain]
+```
+
+```{r}
+
+```
+
+Comentarios//: El random forest ha señalado que hay 8 variables destacando sobre el resto y que serán las elegidas para el modelado. Este modelo al compilar repetidas veces se ha obtenido entre 8-10 variables. Se optó por elegir las variables señaladas por el modelo la primera vez que se ejecutó (los resultados no fueron visualizados para que el lector no se liase).
+
+
+# Selección del dataset final
+```{r}
+dataprep.quiz <- datafinal.quiz[,c(4,6,7,16,18,23,25,27,28)]
+head(dataprep.quiz)
+```
+
+# Estadística Descriptiva Univariante
+
+## Variable Numérica
+```{r}
+profiling_num(dataprep.quiz)
+```
+
+```{r, warning=FALSE}
+plot_num(dataprep.quiz)
+```
+
+## Variables Categóricas
+```{r, warning=FALSE}
+freq(dataprep.quiz)
+```
+
+# Guardar el archivo de datos preprocesado
+```{r}
+saveRDS(dataprep.quiz, "dataprep.quiz.rds")
+```
